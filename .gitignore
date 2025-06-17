@@ -1,0 +1,19 @@
+# Entorno virtual
+.venv/
+venv/
+env/
+.env
+
+# VS Code
+.vscode/
+
+# Archivos temporales
+__pycache__/
+*.pyc
+.DS_Store
+
+# Streamlit cache
+.streamlit/
+
+# Archivos de sistema
+Thumbs.db
