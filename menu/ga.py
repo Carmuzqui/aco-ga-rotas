@@ -19,7 +19,7 @@ def render():
 
     st.subheader("Parâmetros do GA")
     n_pop = st.number_input("Tamanho da população", 2, 200, 50)
-    n_iter = st.number_input("Número de iterações", 10, 10000, st.session_state.get("max_iter", 300), step=10)
+    n_iter = st.number_input("Número de iterações", 10, 10000, st.session_state.get("max_iter", 1000), step=10)
     p_crossover = st.slider("Probabilidade de crossover", 0.0, 1.0, 0.9, 0.05)
     p_mutacao = st.slider("Probabilidade de mutação", 0.0, 1.0, 0.2, 0.05)
     elite_frac = st.slider("Fração de elite", 0.0, 0.5, 0.2, 0.05)

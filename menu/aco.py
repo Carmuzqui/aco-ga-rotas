@@ -20,7 +20,7 @@ def render():
 
     st.subheader("Parâmetros do ACO")
     n_formigas = st.number_input("Número de formigas", 1, 100, 20)
-    n_iter = st.number_input("Número de iterações", 10, 10000, st.session_state.get("max_iter", 300), step=10)
+    n_iter = st.number_input("Número de iterações", 10, 10000, st.session_state.get("max_iter", 1000), step=10)
     alfa = st.slider("Alfa (peso do feromônio)", 0.1, 5.0, 1.0, 0.1)
     beta = st.slider("Beta (peso da heurística)", 0.1, 10.0, 5.0, 0.1)
     evaporacao = st.slider("Taxa de evaporação", 0.01, 1.0, 0.5, 0.01)
