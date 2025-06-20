@@ -80,3 +80,10 @@ def render():
             st.info(f"Tempo de execução do algoritmo: {tempo_exec:.2f} segundos")
     else:
         st.info("Configure os parâmetros e clique em 'Executar GA' para visualizar o resultado.")
+
+
+
+
+
+
+
