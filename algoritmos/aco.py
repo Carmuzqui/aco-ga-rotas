@@ -29,6 +29,9 @@
 #     melhor_custo = float("inf")
 #     historico = []
 
+#     # Novo: lista para armazenar as melhores rotas únicas
+#     top_rotas = []
+
 #     for iteracao in range(n_iter):
 #         rotas = []
 #         custos_rotas = []
@@ -49,8 +52,6 @@
 #                         probas.append(0)
 #                 soma = sum(probas)
 #                 if soma == 0:
-#                     # Nenhum caminho viável por probabilidade: escolha determinística do próximo não visitado
-#                     # (com custo altíssimo, mas força uma solução completa)
 #                     prox = [j for j, v in enumerate(visitado) if not v][0]
 #                 else:
 #                     probas = [p / soma for p in probas]
@@ -59,13 +60,8 @@
 #                 visitado[prox] = True
 #                 atual = prox
 
-#             caminho.append(cidade_inicio)  # Retorna ao início
-
-#             # Agora SEMPRE rota completa!
-#             custo_total = sum(
-#                 custos[caminho[i], caminho[i + 1]]
-#                 for i in range(len(caminho) - 1)
-#             )
+#             caminho.append(cidade_inicio)
+#             custo_total = sum(custos[caminho[i], caminho[i + 1]] for i in range(len(caminho) - 1))
 #             rotas.append(caminho)
 #             custos_rotas.append(custo_total)
 
@@ -73,7 +69,7 @@
 #                 melhor_custo = custo_total
 #                 melhor_rota = caminho[:]
 
-#         # Atualiza feromônio apenas para rotas completas
+#         # Atualização de feromônio
 #         feromonio = feromonio * (1 - evaporacao)
 #         for rota, custo in zip(rotas, custos_rotas):
 #             for i in range(len(rota) - 1):
@@ -81,12 +77,30 @@
 
 #         historico.append(melhor_custo)
 
-#     # Garante que sempre retorna rota válida
+#         # Guardar todas rotas únicas com custos para análise posterior
+#         for rota, custo in zip(rotas, custos_rotas):
+#             if (rota, custo) not in top_rotas:
+#                 top_rotas.append((rota, custo))
+
+#     # Selecionar as três melhores rotas distintas
+#     top_rotas = sorted(top_rotas, key=lambda x: x[1])
+#     melhores_3 = []
+#     rotas_cidades_str = set()
+#     for rota, custo in top_rotas:
+#         rota_nomes = tuple(cidades[i] for i in rota)
+#         # Checa se a sequência já foi registrada para não duplicar
+#         if rota_nomes not in rotas_cidades_str:
+#             melhores_3.append({"rota": list(rota_nomes), "custo": custo})
+#             rotas_cidades_str.add(rota_nomes)
+#         if len(melhores_3) == 3:
+#             break
+
 #     rota_cidades = [cidades[i] for i in melhor_rota]
 #     return {
 #         "rota": rota_cidades,
 #         "custo": melhor_custo,
-#         "historico": historico
+#         "historico": historico,
+#         "top_3": melhores_3
 #     }
 
 
@@ -94,12 +108,16 @@
 
 
 
-# algoritmos/aco.py
+
+
+
 import numpy as np
 import random
 
 def run_aco(
     matriz_custos,
+    matriz_distancias,
+    matriz_tempos,
     n_formigas=20,
     n_iter=300,
     alfa=1.0,
@@ -116,6 +134,8 @@ def run_aco(
     n_cidades = matriz_custos.shape[0]
     cidades = list(matriz_custos.index)
     custos = matriz_custos.values
+    distancias = matriz_distancias.values
+    tempos = matriz_tempos.values
 
     feromonio = np.ones((n_cidades, n_cidades)) * feromonio_inicial
     visibilidade = 1 / (custos + 1e-10)
@@ -123,14 +143,17 @@ def run_aco(
 
     melhor_rota = None
     melhor_custo = float("inf")
+    melhor_dist = float("inf")
+    melhor_tempo = float("inf")
     historico = []
 
-    # Novo: lista para armazenar as melhores rotas únicas
     top_rotas = []
 
     for iteracao in range(n_iter):
         rotas = []
         custos_rotas = []
+        dist_rotas = []
+        tempo_rotas = []
 
         for _ in range(n_formigas):
             visitado = [False] * n_cidades
@@ -158,14 +181,19 @@ def run_aco(
 
             caminho.append(cidade_inicio)
             custo_total = sum(custos[caminho[i], caminho[i + 1]] for i in range(len(caminho) - 1))
+            dist_total = sum(distancias[caminho[i], caminho[i + 1]] for i in range(len(caminho) - 1))
+            tempo_total = sum(tempos[caminho[i], caminho[i + 1]] for i in range(len(caminho) - 1))
             rotas.append(caminho)
             custos_rotas.append(custo_total)
+            dist_rotas.append(dist_total)
+            tempo_rotas.append(tempo_total)
 
             if custo_total < melhor_custo:
                 melhor_custo = custo_total
                 melhor_rota = caminho[:]
+                melhor_dist = dist_total
+                melhor_tempo = tempo_total
 
-        # Atualização de feromônio
         feromonio = feromonio * (1 - evaporacao)
         for rota, custo in zip(rotas, custos_rotas):
             for i in range(len(rota) - 1):
@@ -173,20 +201,23 @@ def run_aco(
 
         historico.append(melhor_custo)
 
-        # Guardar todas rotas únicas com custos para análise posterior
-        for rota, custo in zip(rotas, custos_rotas):
-            if (rota, custo) not in top_rotas:
-                top_rotas.append((rota, custo))
+        for rota, custo, dist, tempo in zip(rotas, custos_rotas, dist_rotas, tempo_rotas):
+            if (tuple(rota), custo, dist, tempo) not in top_rotas:
+                top_rotas.append((rota, custo, dist, tempo))
 
     # Selecionar as três melhores rotas distintas
     top_rotas = sorted(top_rotas, key=lambda x: x[1])
     melhores_3 = []
     rotas_cidades_str = set()
-    for rota, custo in top_rotas:
+    for rota, custo, dist, tempo in top_rotas:
         rota_nomes = tuple(cidades[i] for i in rota)
-        # Checa se a sequência já foi registrada para não duplicar
         if rota_nomes not in rotas_cidades_str:
-            melhores_3.append({"rota": list(rota_nomes), "custo": custo})
+            melhores_3.append({
+                "rota": list(rota_nomes),
+                "custo": custo,
+                "distancia": dist,
+                "tempo": tempo
+            })
             rotas_cidades_str.add(rota_nomes)
         if len(melhores_3) == 3:
             break
@@ -195,6 +226,8 @@ def run_aco(
     return {
         "rota": rota_cidades,
         "custo": melhor_custo,
+        "distancia": melhor_dist,
+        "tempo": melhor_tempo,
         "historico": historico,
         "top_3": melhores_3
     }
