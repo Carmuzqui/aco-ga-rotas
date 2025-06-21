@@ -95,7 +95,7 @@ from dotenv import load_dotenv
 def atualizar_matrizes_google():
     # Carregar variáveis do .env
     load_dotenv()
-    GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
+    GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY") or st.secrets.get("GOOGLE_API_KEY")
     if not GOOGLE_API_KEY:
         raise ValueError("A variável de ambiente GOOGLE_API_KEY não está definida. Coloque sua chave no arquivo .env.")
 
