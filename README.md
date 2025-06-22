@@ -27,7 +27,9 @@ Este projeto implementa e compara algoritmos de **Colônia de Formigas (ACO)** e
 ### 1. **Clone o repositório**
 
 powershell:
+
 git clone https://github.com/Luskinha04/Sistema-de-Log-stica-aplicando-o-ACO-e-AG
+
 cd SEU_REPOSITORIO
 
 ### 2. **Crie e ative o ambiente virtual**
@@ -39,6 +41,7 @@ pip install -r requirements.txt
 
 ### 4. **Configure as variáveis de ambiente**
 Crie um arquivo chamado .env na raiz do projeto e insira sua chave da API do Google Maps:
+
 GOOGLE_API_KEY= sua_chave_aqui
 
 ### 5. **Execute o projeto**
