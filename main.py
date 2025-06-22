@@ -18,7 +18,6 @@ import parametros
 import aco
 import ga
 import comparacao
-import sobre
 
 # Configuração inicial da página Streamlit (título, layout e ícone)
 st.set_page_config(
