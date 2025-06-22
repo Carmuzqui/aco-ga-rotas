@@ -1,4 +1,5 @@
 # menu/aco.py
+
 import streamlit as st
 import pandas as pd
 from algoritmos.aco import run_aco
@@ -13,16 +14,20 @@ import polyline
 from dotenv import load_dotenv
 
 def render():
+    # Título da página
     st.header("Algoritmo de colônia de formigas (ACO)")
 
+    # Carrega as matrizes de custos, distâncias e tempos do diretório de dados
     matriz_custos = pd.read_csv("dados/matriz_custos.csv", index_col=0)
     matriz_distancias = pd.read_csv("dados/matriz_distancias.csv", index_col=0)
     matriz_tempos = pd.read_csv("dados/matriz_tempos.csv", index_col=0)
     cidades = matriz_custos.index.tolist()
 
+    # Permite selecionar a cidade inicial/final (default: Patrocínio)
     idx_patrocinio = cidades.index("Patrocínio") if "Patrocínio" in cidades else 0
     cidade_inicio = st.selectbox("Cidade inicial/final", cidades, index=idx_patrocinio)
 
+    # Seção de configuração dos parâmetros do ACO
     st.subheader("Parâmetros do ACO")
     n_formigas = st.number_input("Número de formigas", 1, 100, 20)
     n_iter = st.number_input("Número de iterações", 10, 10000, st.session_state.get("max_iter", 1000), step=10)
@@ -30,25 +35,24 @@ def render():
     beta = st.slider("Beta (peso da heurística)", 0.1, 10.0, 5.0, 0.1)
     evaporacao = st.slider("Taxa de evaporação", 0.01, 1.0, 0.5, 0.01)
 
-    # Inicializar cache de polilíneas
+    # Inicializa cache para rotas polilinhas (evita consultas duplicadas à API)
     if "polylines_cache" not in st.session_state:
         st.session_state["polylines_cache"] = {}
 
-    # Clave de Google API (reemplaza con tu método de cargar claves si es necesario)
+    # Carrega a chave da API do Google Maps
     load_dotenv()
-    # GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
     GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY") or st.secrets.get("GOOGLE_API_KEY")
     if not GOOGLE_API_KEY:
-        st.error("No hay clave de Google API configurada.")
+        st.error("Não há chave da API do Google configurada.")
         return
 
-    # Función para obtener la polyline real entre dos ciudades (cacheada)
-    def obtener_polyline(origen, destino, coords_dict):
+    # Função auxiliar para obter a polyline real entre duas cidades, utilizando cache
+    def obter_polyline(origem, destino, coords_dict):
         cache = st.session_state["polylines_cache"]
-        clave = (origen, destino)
-        if clave in cache:
-            return cache[clave]
-        orig_coord = coords_dict[origen]
+        chave = (origem, destino)
+        if chave in cache:
+            return cache[chave]
+        orig_coord = coords_dict[origem]
         dest_coord = coords_dict[destino]
         url = (
             f"https://maps.googleapis.com/maps/api/directions/json?"
@@ -60,12 +64,13 @@ def render():
         if data["status"] == "OK":
             polyline_points = data["routes"][0]["overview_polyline"]["points"]
             coords = polyline.decode(polyline_points)
-            cache[clave] = coords
+            cache[chave] = coords
             return coords
         else:
-            st.warning(f"No se pudo obtener ruta para {origen} → {destino}: {data['status']}")
-            return [orig_coord, dest_coord]  # fallback recto
+            st.warning(f"Não foi possível obter rota para {origem} → {destino}: {data['status']}")
+            return [orig_coord, dest_coord]  # fallback: linha reta
 
+    # Botão para executar o ACO com os parâmetros definidos
     if st.button("Executar ACO"):
         idx_inicio = cidades.index(cidade_inicio)
         t0 = time.time()
@@ -82,6 +87,7 @@ def render():
         )
         t1 = time.time()
 
+        # Salva os parâmetros e resultados no estado da sessão para acesso rápido
         st.session_state["aco_params"] = [
             matriz_custos,
             matriz_distancias,
@@ -106,10 +112,12 @@ def render():
             "tempo_execucao": resultado["tempo_execucao"]
         }
 
+    # Se já existe um resultado em sessão, exibe o resumo e visualizações
     if "aco_resultado" in st.session_state:
         resultado = st.session_state["aco_resultado"]
         st.success(f"Melhor rota encontrada: {' → '.join(resultado['rota'])}")
 
+        # Exibe métricas principais da melhor rota
         col1, col2, col3 = st.columns(3)
         with col1:
             st.markdown(
@@ -128,13 +136,16 @@ def render():
                 unsafe_allow_html=True
             )
 
+        # Carrega as coordenadas das cidades do arquivo JSON
         with open("dados/municipios.json", encoding="utf-8") as f:
             dados_cidades = json.load(f)
         coords_dict = {d["nome"]: (d["lat"], d["lng"]) for d in dados_cidades}
 
+        # Definição de cores para as rotas
         cores = ["blue", "red", "orange"]
         cores_emojis = ["🔵", "🔴", "🟠"]
 
+        # Permite selecionar quais das 3 melhores rotas exibir no mapa
         colunas = st.columns(3)
         mostrar_rotas = []
         for idx, rota_info in enumerate(resultado.get("top_3", [])):
@@ -147,6 +158,7 @@ def render():
         m = None
         cidades_marcadas = set()
 
+        # Para cada rota selecionada, desenha o trajeto real no mapa utilizando a API do Google Directions
         for idx, rota_info in enumerate(resultado.get("top_3", [])):
             if not mostrar_rotas[idx]:
                 continue
@@ -154,17 +166,19 @@ def render():
             rota = rota_info["rota"]
             ruta_real = []
             for i in range(len(rota) - 1):
-                coords_poly = obtener_polyline(rota[i], rota[i+1], coords_dict)
+                coords_poly = obter_polyline(rota[i], rota[i+1], coords_dict)
                 if i > 0:
                     coords_poly = coords_poly[1:]
                 ruta_real.extend(coords_poly)
 
+            # Inicializa o mapa na primeira coordenada da rota
             if m is None:
                 lat_c, lng_c = ruta_real[0]
                 m = folium.Map(location=[lat_c, lng_c], zoom_start=8)
 
             horas_rota = rota_info.get("tempo", 0) / 60.0
 
+            # Adiciona a rota como polilinha no mapa
             folium.PolyLine(
                 locations=ruta_real,
                 color=cores[idx % len(cores)],
@@ -178,6 +192,7 @@ def render():
                 )
             ).add_to(m)
 
+            # Adiciona marcadores para cada cidade do trajeto
             for (lat, lng), nome in zip([coords_dict[n] for n in rota], rota):
                 if nome not in cidades_marcadas:
                     folium.CircleMarker(
@@ -191,11 +206,13 @@ def render():
                     ).add_to(m)
                     cidades_marcadas.add(nome)
 
+        # Exibe o mapa interativo, se houver pelo menos uma rota selecionada
         if m:
             st_folium(m, width=800, height=500)
         else:
             st.info("Selecione pelo menos uma rota para visualizar o mapa.")
 
+        # Gráfico de evolução do custo ao longo das iterações (convergência)
         fig = go.Figure()
         fig.add_trace(go.Scatter(
             y=resultado["historico"],
@@ -210,6 +227,7 @@ def render():
         )
         st.plotly_chart(fig, use_container_width=True)
 
+        # Exibe detalhes das 3 melhores rotas
         for idx, rota_info in enumerate(resultado.get("top_3", [])):
             st.markdown(f"**Rota #{idx+1}:** {' → '.join(rota_info['rota'])}")
             c1, c2, c3 = st.columns(3)
@@ -230,6 +248,7 @@ def render():
                     unsafe_allow_html=True
                 )
 
+        # Exibe o tempo de execução total do algoritmo
         tempo_exec = resultado.get("tempo_execucao", None)
         if tempo_exec is not None:
             st.info(f"Tempo de execução do algoritmo: {tempo_exec:.2f} segundos")

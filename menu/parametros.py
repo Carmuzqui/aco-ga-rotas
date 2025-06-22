@@ -1,17 +1,24 @@
 # menu/parametros.py
+
+# Importa a biblioteca Streamlit para interface web interativa
 import streamlit as st
+
+# Importa função para calcular matriz de custos a partir dos parâmetros informados
 from algoritmos.matriz_custos import calcular_matriz_custos
+
+# Importa pandas para manipulação de dados tabulares
 import pandas as pd
 import os
 
-# IMPORTANTE: importar la función que actualiza matrices via Google API
+# Importa função para atualizar as matrizes de distância e tempo usando a API do Google Maps
 from algoritmos.distancia_tempo import atualizar_matrizes_google
 
 def render():
+    # Cabeçalho da página de configuração
     st.header("Configuração de parâmetros globais")
     st.write("Defina aqui os custos e parâmetros dos algoritmos. As alterações só terão efeito ao clicar em 'Atualizar parâmetros e matriz de custos'.")
 
-    # Parâmetros globais de custo (inputs temporários)
+    # Parâmetros globais de custo, permitindo ao usuário informar o custo por km e por minuto
     custo_km = st.number_input(
         "Custo por quilômetro (R$)", min_value=0.0, max_value=100.0,
         value=st.session_state.get("custo_km", 2.5), step=0.1
@@ -21,7 +28,7 @@ def render():
         value=st.session_state.get("custo_min", 0.5), step=0.1
     )
 
-    # Parâmetros dos algoritmos
+    # Parâmetros dos algoritmos de otimização (limite de iterações e tempo máximo)
     max_iter = st.number_input(
         "Máximo de iterações", min_value=10, max_value=5000,
         value=st.session_state.get("max_iter", 1000), step=10
@@ -31,14 +38,15 @@ def render():
         value=st.session_state.get("tempo_limite", 300), step=10
     )
 
+    # Botão para atualizar parâmetros e recalcular matriz de custos
     if st.button("Atualizar parâmetros e matriz de custos"):
-        # Atualiza sessão
+        # Atualiza variáveis na sessão
         st.session_state["custo_km"] = custo_km
         st.session_state["custo_min"] = custo_min
         st.session_state["max_iter"] = int(max_iter)
         st.session_state["tempo_limite"] = int(tempo_limite)
 
-        # Calcula e salva matriz de custos
+        # Calcula e salva a nova matriz de custos
         custos = calcular_matriz_custos(
             custo_km=custo_km,
             custo_min=custo_min
@@ -52,7 +60,7 @@ def render():
             mime="text/csv"
         )
     else:
-        # Mostra última matriz de custos, se existir
+        # Exibe a última matriz de custos gerada, se existir
         path_custos = "dados/matriz_custos.csv"
         if os.path.exists(path_custos):
             custos = pd.read_csv(path_custos, index_col=0)
@@ -67,17 +75,17 @@ def render():
         else:
             st.info("Nenhuma matriz de custos foi gerada ainda.")
 
-    # --- NOVA FUNCIONALIDADE: Editar trecho específico ao final ---
+    # --- NOVA FUNCIONALIDADE: Edição manual de trechos entre dois municípios ---
     st.divider()
     st.subheader("Editar trecho específico entre dois municípios")
 
-    # Caminhos dos arquivos das matrizes
+    # Define caminhos dos arquivos das matrizes
     path_dist = "dados/matriz_distancias.csv"
     path_temp = "dados/matriz_tempos.csv"
     path_custos = "dados/matriz_custos.csv"
     cidades = None
 
-    # Tenta carregar as matrizes, se existirem
+    # Tenta carregar as matrizes de distância, tempo e custo, se existirem
     if os.path.exists(path_dist):
         matriz_dist = pd.read_csv(path_dist, index_col=0)
         cidades = matriz_dist.index.tolist()
@@ -90,6 +98,7 @@ def render():
         if cidades is None:
             cidades = matriz_custos.index.tolist()
 
+    # Se as cidades foram carregadas, permite seleção de origem e destino
     if cidades is not None:
         col1, col2 = st.columns(2)
         with col1:
@@ -98,7 +107,7 @@ def render():
             municipio_b = st.selectbox("Destino", cidades, key="trecho_b")
 
         if municipio_a != municipio_b:
-            # Valores atuais, se disponíveis
+            # Busca valores atuais do trecho selecionado, se disponíveis
             dist_atual = matriz_dist.loc[municipio_a, municipio_b] if os.path.exists(path_dist) else 0.0
             temp_atual = matriz_temp.loc[municipio_a, municipio_b] if os.path.exists(path_temp) else 0.0
             custo_atual = matriz_custos.loc[municipio_a, municipio_b] if os.path.exists(path_custos) else 0.0
@@ -107,6 +116,7 @@ def render():
                 f"**Valores atuais:** Distância: `{dist_atual:.2f} km` | Tempo: `{temp_atual:.2f} min` | Custo: `R$ {custo_atual:.2f}`"
             )
 
+            # Permite edição manual dos valores do trecho selecionado
             nova_dist = st.number_input(
                 "Nova distância (km)", min_value=0.0, value=float(dist_atual), step=0.1, key="nova_dist"
             )
@@ -115,7 +125,7 @@ def render():
             )
 
             if st.button("Atualizar trecho selecionado"):
-                # Atualiza arquivos, caso existam
+                # Atualiza as matrizes com os novos valores informados
                 atualizado = False
 
                 if os.path.exists(path_dist):
@@ -155,10 +165,11 @@ def render():
         "O processo pode levar alguns minutos dependendo do número de municípios."
     )
 
-    if st.button("Atualizar todas as matrizes de distância e tempo via Google API"):
+    # Botão para atualizar todas as matrizes automaticamente via Google Maps API
+    if st.button("Atualizar as matrizes de distância e tempo via Google API"):
         with st.spinner("Atualizando as matrizes de distância e tempo... Isso pode levar alguns minutos."):
             try:
-                atualizar_matrizes_google()  # Função que deve estar definida em algoritmos/distancia_tempo.py
+                atualizar_matrizes_google()  # Função definida em algoritmos/distancia_tempo.py
                 st.success("Matrizes de distância e tempo atualizadas com sucesso usando a API do Google!")
             except Exception as e:
                 st.error(f"Ocorreu um erro ao atualizar as matrizes: {str(e)}")

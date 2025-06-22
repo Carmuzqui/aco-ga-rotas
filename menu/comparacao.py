@@ -1,4 +1,5 @@
 # menu/comparacao.py
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -14,7 +15,10 @@ import polyline
 import os
 
 def run_multiple(alg_fn, n, params):
-    """Executa o algoritmo n vezes e retorna DataFrame com resultados."""
+    """
+    Executa um algoritmo (ACO ou GA) n vezes com diferentes seeds,
+    retornando um DataFrame com os resultados das execuções.
+    """
     resultados = []
     for i in range(n):
         seed = np.random.randint(1, 100000)
@@ -31,7 +35,11 @@ def run_multiple(alg_fn, n, params):
     return pd.DataFrame(resultados)
 
 def obter_polyline(origen, destino, coords_dict):
-    # Inicializa o cache de polilíneas na sessão, se necessário
+    """
+    Busca a polilinha real entre duas cidades usando a API do Google Directions,
+    com cache em memória para evitar requisições duplicadas.
+    """
+    # Inicializa o cache se necessário
     if "polylines_cache" not in st.session_state:
         st.session_state["polylines_cache"] = {}
 
@@ -43,7 +51,7 @@ def obter_polyline(origen, destino, coords_dict):
     orig_coord = coords_dict[origen]
     dest_coord = coords_dict[destino]
 
-    # Busca a chave da API do Google
+    # Carrega a chave da API do Google Maps
     from dotenv import load_dotenv
     load_dotenv()
     GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY") or st.secrets.get("GOOGLE_API_KEY")
@@ -71,7 +79,7 @@ def render():
     st.header("Comparação dos algoritmos")
     st.markdown("Rodar ambos algoritmos várias vezes para avaliar desempenho médio e variabilidade das soluções.")
 
-    # Recupera parâmetros das execuções anteriores
+    # Recupera os parâmetros das últimas execuções de ACO e GA
     try:
         aco_params = st.session_state['aco_params']
         ga_params = st.session_state['ga_params']
@@ -79,9 +87,10 @@ def render():
         st.warning("Execute ambos algoritmos pelo menos uma vez para carregar os parâmetros.")
         return
 
-    # Configurações do experimento
+    # Parâmetro: número de execuções para a análise estatística
     n_execucoes = st.number_input("Número de execuções por algoritmo", 3, 30, 5)
 
+    # Botão para rodar várias execuções de cada algoritmo
     if st.button("Executar múltiplas simulações"):
         with st.spinner("Executando ACO..."):
             resultados_aco = run_multiple(run_aco, n_execucoes, aco_params)
@@ -90,11 +99,12 @@ def render():
         st.session_state['multi_aco'] = resultados_aco
         st.session_state['multi_ga'] = resultados_ga
 
-    # Se já existem execuções múltiplas salvas:
+    # Se há resultados múltiplos salvos, exibe análise comparativa
     if ('multi_aco' in st.session_state) and ('multi_ga' in st.session_state):
         resultados_aco = st.session_state['multi_aco']
         resultados_ga = st.session_state['multi_ga']
 
+        # Resumo estatístico das execuções
         st.subheader("Tabela resumo das estatísticas")
         resumo = []
         for nome, df in [("ACO", resultados_aco), ("GA", resultados_ga)]:
@@ -109,6 +119,7 @@ def render():
             })
         st.dataframe(pd.DataFrame(resumo).round(2))
 
+        # Boxplots comparativos das principais métricas
         st.subheader("Boxplots comparativos das métricas")
         juntos = pd.concat([
             resultados_aco.assign(Algoritmo="ACO"),
@@ -123,9 +134,9 @@ def render():
             fig = px.box(juntos, x="Algoritmo", y=col, points="all", color="Algoritmo", title=f"Boxplot: {label}")
             st.plotly_chart(fig, use_container_width=True)
 
+        # Mapa interativo com as melhores rotas de cada algoritmo
         st.subheader("Mapa das melhores rotas encontradas por cada algoritmo")
-
-        # Recupera as melhores rotas (menor custo em todas execuções)
+        # Identifica a melhor rota (menor custo) de cada algoritmo
         melhor_aco = resultados_aco.iloc[resultados_aco["custo"].idxmin()]
         melhor_ga = resultados_ga.iloc[resultados_ga["custo"].idxmin()]
 
@@ -133,7 +144,7 @@ def render():
             dados_cidades = json.load(f)
         coords_dict = {d["nome"]: (d["lat"], d["lng"]) for d in dados_cidades}
 
-        # Checkboxes para mostrar/ocultar cada rota
+        # Permite exibir/ocultar cada rota
         col_cb = st.columns(2)
         mostrar_aco = col_cb[0].checkbox("Exibir melhor rota ACO", value=True)
         mostrar_ga  = col_cb[1].checkbox("Exibir melhor rota GA", value=True)
@@ -144,6 +155,7 @@ def render():
             m = folium.Map(location=centro, zoom_start=8)
             cidades_marcadas = set()
 
+            # Desenha rota ACO se selecionada
             if mostrar_aco:
                 rota_aco = melhor_aco["rota"]
                 rota_real_aco = []
@@ -161,6 +173,7 @@ def render():
                         ).add_to(m)
                         cidades_marcadas.add(nome_cidade)
 
+            # Desenha rota GA se selecionada
             if mostrar_ga:
                 rota_ga = melhor_ga["rota"]
                 rota_real_ga = []
@@ -182,16 +195,16 @@ def render():
         else:
             st.info("Selecione ao menos uma rota para visualizar o mapa.")
 
+        # Exibe conclusões dinâmicas baseadas nos resultados
         st.subheader("Conclusão")
-        # Conclusão dinâmica
         media_aco = np.mean(resultados_aco["custo"])
         media_ga = np.mean(resultados_ga["custo"])
         dp_aco = np.std(resultados_aco["custo"])
         dp_ga = np.std(resultados_ga["custo"])
-        
         melhor_aco_custo = np.min(resultados_aco["custo"])
         melhor_ga_custo = np.min(resultados_ga["custo"])
 
+        # Avaliação comparativa automática
         if abs(media_aco - media_ga) < 1e-2:
             st.info("Os algoritmos ACO e GA apresentaram desempenhos muito similares em termos de custo médio das rotas para as condições testadas.")
         elif media_aco < media_ga:
@@ -199,7 +212,7 @@ def render():
         else:
             st.info(f"O GA apresentou menor custo médio ({media_ga:.2f}) em comparação ao ACO ({media_aco:.2f}), com desvio padrão {dp_ga:.2f} contra {dp_aco:.2f}.")
 
-        # Comparação da melhor solução global
+        # Indica o algoritmo da melhor solução global
         if melhor_aco_custo < melhor_ga_custo:
             st.success(f"A melhor solução global encontrada foi pelo ACO com custo = R$ {melhor_aco_custo:.2f}.")
         elif melhor_ga_custo < melhor_aco_custo:
