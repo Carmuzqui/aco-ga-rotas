@@ -1,4 +1,4 @@
-# 🚚 Otimização de Rotas Logísticas com Algoritmos Bioinspirados (ACO & GA)
+# 🚚 Otimização de rotas logísticas com algoritmos bioinspirados (ACO & GA)
 
 Este projeto implementa e compara algoritmos de **Colônia de Formigas (ACO)** e **Algoritmo Genético (GA)** aplicados ao problema de roteamento de veículos (VRP) sobre a malha realista de municípios do Alto Paranaíba/MG, utilizando dados atualizados de distância e tempo via **API do Google Maps**. Todo o sistema conta com interface gráfica interativa em **Streamlit**, permitindo fácil configuração, análise e visualização dos resultados em mapas interativos.
 
@@ -22,7 +22,7 @@ Este projeto implementa e compara algoritmos de **Colônia de Formigas (ACO)** e
 
 ---
 
-## **Instalação e Execução Local**
+## **Instalação e execução Local**
 
 ### 1. **Clone o repositório**
 
